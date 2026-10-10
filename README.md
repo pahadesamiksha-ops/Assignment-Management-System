@@ -48,3 +48,15 @@ A console-based Assignment Management System developed using Java.
 # Author
 
 Developed as a Java programming project.
+
+
+## Screenshots
+
+### Main Menu
+![Assignment Management System Main Menu](screenshots/Main menu and Adding assignment.png)
+
+### Assignment List
+![Assignment List](screenshots/Viewing and Updating.png)
+
+### Deleting and Exiting
+![Assignment List](screenshots/Deleting and Exiting.png)

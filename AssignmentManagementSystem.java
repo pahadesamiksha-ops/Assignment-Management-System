@@ -1,9 +1,13 @@
+
+import java.io.*;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Scanner;
 
-// Class 1: Assignment
-class Assignment {
+class Assignment implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private String title;
     private LocalDate dueDate;
     private boolean isCompleted;
@@ -26,35 +30,55 @@ class Assignment {
         return isCompleted;
     }
 
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public void setDueDate(LocalDate dueDate) {
+        this.dueDate = dueDate;
+    }
+
     public void markCompleted() {
-        this.isCompleted = true;
+        isCompleted = true;
     }
 
     public void markPending() {
-        this.isCompleted = false;
+        isCompleted = false;
     }
 
     public String getStatus() {
         return isCompleted ? "Completed" : "Pending";
     }
+
+    public boolean isOverdue() {
+        return !isCompleted && dueDate.isBefore(LocalDate.now());
+    }
 }
 
-// Class 2: Assignment Management System (Main)
 public class AssignmentManagementSystem {
-    private static ArrayList<Assignment> assignments = new ArrayList<>();
-    private static Scanner sc = new Scanner(System.in);
+
+    private static final String FILE_NAME = "assignments.dat";
+    private static final ArrayList<Assignment> assignments =
+            new ArrayList<>();
+    private static final Scanner sc = new Scanner(System.in);
 
     public static void main(String[] args) {
+        loadAssignments();
+
         int choice;
         do {
-            System.out.println("\n=== ASSIGNMENT MANAGEMENT SYSTEM ===");
+            System.out.println("\n================================");
+            System.out.println("   ASSIGNMENT MANAGEMENT SYSTEM");
+            System.out.println("================================");
             System.out.println("1. Add Assignment");
             System.out.println("2. View All Assignments");
             System.out.println("3. Update Assignment Status");
-            System.out.println("4. Exit");
+            System.out.println("4. Edit Assignment");
+            System.out.println("5. Delete Assignment");
+            System.out.println("6. Exit");
             System.out.print("Enter your choice: ");
-            choice = sc.nextInt();
-            sc.nextLine();  // clear buffer
+
+            choice = readInt();
 
             switch (choice) {
                 case 1:
@@ -67,28 +91,71 @@ public class AssignmentManagementSystem {
                     updateStatus();
                     break;
                 case 4:
-                    System.out.println("Exiting the system... Goodbye!");
+                    editAssignment();
+                    break;
+                case 5:
+                    deleteAssignment();
+                    break;
+                case 6:
+                    saveAssignments();
+                    System.out.println("Goodbye! Your data is saved.");
                     break;
                 default:
-                    System.out.println("Invalid choice! Try again.");
+                    System.out.println(
+                            "Invalid choice! Enter a number from 1 to 6.");
             }
-        } while (choice != 4);
+        } while (choice != 6);
+
+        sc.close();
+    }
+
+    // Read integers safely without crashing on text input
+    private static int readInt() {
+        while (true) {
+            String input = sc.nextLine().trim();
+            try {
+                return Integer.parseInt(input);
+            } catch (NumberFormatException e) {
+                System.out.print("Enter a valid whole number: ");
+            }
+        }
+    }
+
+    private static String readTitle(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String title = sc.nextLine().trim();
+
+            if (!title.isEmpty()) {
+                return title;
+            }
+
+            System.out.println("Title cannot be empty.");
+        }
+    }
+
+    private static LocalDate readDate(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = sc.nextLine().trim();
+
+            try {
+                return LocalDate.parse(input);
+            } catch (DateTimeParseException e) {
+                System.out.println(
+                        "Invalid date! Use YYYY-MM-DD, e.g. 2026-12-25.");
+            }
+        }
     }
 
     private static void addAssignment() {
-        System.out.print("Enter assignment title: ");
-        String title = sc.nextLine();
+        String title = readTitle("Enter assignment title: ");
+        LocalDate date = readDate("Enter due date (YYYY-MM-DD): ");
 
-        System.out.print("Enter due date (YYYY-MM-DD): ");
-        String dateInput = sc.nextLine();
+        assignments.add(new Assignment(title, date));
+        saveAssignments();
 
-        try {
-            LocalDate dueDate = LocalDate.parse(dateInput);
-            assignments.add(new Assignment(title, dueDate));
-            System.out.println("✅ Assignment added successfully!");
-        } catch (Exception e) {
-            System.out.println("❌ Invalid date format. Use YYYY-MM-DD.");
-        }
+        System.out.println("Assignment added successfully!");
     }
 
     private static void viewAssignments() {
@@ -98,43 +165,159 @@ public class AssignmentManagementSystem {
         }
 
         System.out.println("\n--- ASSIGNMENT LIST ---");
-        System.out.printf("%-5s %-25s %-15s %-10s\n", "ID", "Title", "Due Date", "Status");
+        System.out.printf("%-5s %-25s %-15s %-12s %-10s%n",
+                "ID", "Title", "Due Date", "Status", "Deadline");
+
         for (int i = 0; i < assignments.size(); i++) {
             Assignment a = assignments.get(i);
-            System.out.printf("%-5d %-25s %-15s %-10s\n", (i + 1), a.getTitle(), a.getDueDate(), a.getStatus());
+
+            String deadline = a.isOverdue() ? "Overdue" : "-";
+
+            System.out.printf("%-5d %-25.25s %-15s %-12s %-10s%n",
+                    i + 1, a.getTitle(), a.getDueDate(),
+                    a.getStatus(), deadline);
         }
     }
 
-    private static void updateStatus() {
+    private static int selectAssignment() {
         if (assignments.isEmpty()) {
-            System.out.println("No assignments to update.");
-            return;
+            System.out.println("No assignments available.");
+            return -1;
         }
 
         viewAssignments();
-        System.out.print("Enter assignment ID to update: ");
-        int id = sc.nextInt();
-        sc.nextLine(); // clear buffer
+        System.out.print("Enter assignment ID: ");
+        int id = readInt();
 
         if (id < 1 || id > assignments.size()) {
-            System.out.println("❌ Invalid ID!");
+            System.out.println("Invalid assignment ID.");
+            return -1;
+        }
+
+        return id - 1;
+    }
+
+    private static void updateStatus() {
+        int index = selectAssignment();
+        if (index == -1) {
             return;
         }
 
-        Assignment a = assignments.get(id - 1);
+        Assignment a = assignments.get(index);
+
         System.out.println("1. Mark as Completed");
         System.out.println("2. Mark as Pending");
         System.out.print("Enter your choice: ");
-        int statusChoice = sc.nextInt();
 
-        if (statusChoice == 1) {
+        int choice = readInt();
+
+        if (choice == 1) {
             a.markCompleted();
-            System.out.println("✅ Marked as Completed!");
-        } else if (statusChoice == 2) {
+        } else if (choice == 2) {
             a.markPending();
-            System.out.println("✅ Marked as Pending!");
         } else {
-            System.out.println("❌ Invalid choice!");
+            System.out.println("Invalid status choice.");
+            return;
+        }
+
+        saveAssignments();
+        System.out.println("Assignment status updated successfully!");
+    }
+
+    private static void editAssignment() {
+        int index = selectAssignment();
+        if (index == -1) {
+            return;
+        }
+
+        Assignment a = assignments.get(index);
+
+        System.out.println("1. Edit Title");
+        System.out.println("2. Edit Due Date");
+        System.out.println("3. Edit Both");
+        System.out.print("Enter your choice: ");
+
+        int choice = readInt();
+
+        switch (choice) {
+            case 1:
+                a.setTitle(readTitle("Enter new title: "));
+                break;
+            case 2:
+                a.setDueDate(readDate("Enter new due date (YYYY-MM-DD): "));
+                break;
+            case 3:
+                a.setTitle(readTitle("Enter new title: "));
+                a.setDueDate(readDate("Enter new due date (YYYY-MM-DD): "));
+                break;
+            default:
+                System.out.println("Invalid choice.");
+                return;
+        }
+
+        saveAssignments();
+        System.out.println("Assignment updated successfully!");
+    }
+
+    private static void deleteAssignment() {
+        int index = selectAssignment();
+        if (index == -1) {
+            return;
+        }
+
+        System.out.print("Are you sure you want to delete this assignment? (y/n): ");
+        String confirmation = sc.nextLine().trim();
+
+        if (confirmation.equalsIgnoreCase("y")) {
+            assignments.remove(index);
+            saveAssignments();
+            System.out.println("Assignment deleted successfully!");
+        } else {
+            System.out.println("Deletion cancelled.");
+        }
+    }
+
+    // Load saved assignments when the application starts
+    @SuppressWarnings("unchecked")
+    private static void loadAssignments() {
+        File file = new File(FILE_NAME);
+
+        if (!file.exists()) {
+            return;
+        }
+
+        try (ObjectInputStream in =
+                     new ObjectInputStream(new FileInputStream(file))) {
+
+            Object data = in.readObject();
+
+            if (data instanceof ArrayList<?>) {
+                ArrayList<?> loaded = (ArrayList<?>) data;
+
+                for (Object item : loaded) {
+                    if (item instanceof Assignment) {
+                        assignments.add((Assignment) item);
+                    }
+                }
+            }
+
+            System.out.println("Saved assignments loaded successfully.");
+
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println(
+                    "Could not load saved data. Starting with an empty list.");
+        }
+    }
+
+    // Save the current assignments to a local file
+    private static void saveAssignments() {
+        try (ObjectOutputStream out =
+                     new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+
+            out.writeObject(assignments);
+
+        } catch (IOException e) {
+            System.out.println("Error saving assignments: " + e.getMessage());
         }
     }
 }
